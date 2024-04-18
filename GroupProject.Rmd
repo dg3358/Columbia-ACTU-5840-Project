@@ -9,10 +9,10 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r, include = TRUE, warning = FALSE}
+```{r, include = TRUE, message = FALSE}
 library(readxl)
 library(ggplot2)
-library(zoo)
+suppressWarnings(library(zoo))
 ```
 
 # 1. Data Exploration and Preprocessing
@@ -22,10 +22,21 @@ USAFat <- as.vector(t(as.matrix(read_excel("data/USA-FatalCrashes.xlsx",
   range = "B8:M22", col_names = FALSE,.name_repair = "unique_quiet"))))
 ```
 
-Reading in USA population data:
-```{r}
+Reading in USA population data (in hundreds of thousands):
+```{r, include = TRUE}
 USAPOP <- read_excel("data/USAPOP.xlsx")
-USAPOP
+colnames(USAPOP) <- c("Year", "Alabama","Alaska","Arizona","Arkansas",
+ "California","Colorado","Connecticut","Delaware","D.C.","Florida","Georgia",
+ "Hawaii","Idaho","Illinois","Indiana","Iowa","Kansas","Kentucky","Louisiana",
+ "Maine","Maryland","Massachusets","Michigan","Minnesota","Mississippi",
+ "Missouri","Montana", "Nebraska","Nevada", "New Hampshire","New Jersey",
+ "New Mexico","New York","North Carolina", "North Dakota","Ohio", "Oklahoma",   
+ "Oregon", "Pennsylvania", "Rhode Island","South Carolina", "South Dakota", 
+ "Tennessee","Texas", "Utah", "Vermont", "Virginia", "Washington",
+ "West Virginia","Wisconsin", "Wyoming")
+USAPOP$Year <- (2008:2023)*1000
+USAPOP <- USAPOP/1000
+USAPOP$Year <- as.integer(USAPOP$Year)
 ```
 
 
@@ -59,7 +70,6 @@ legEffDate <- as.yearmon("2012-11") +
 #x <- paste("data/",legStates[2],".xlsx", sep = "")
 #as.vector(t(as.matrix(read_excel(x,
 #  range = "B9:M23", col_names = FALSE,.name_repair = "unique_quiet"))))
-legEffDate
 ```
 
 ## c. Calculating State by State Population Data
