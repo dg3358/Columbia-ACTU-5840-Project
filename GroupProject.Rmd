@@ -15,35 +15,48 @@ library(ggplot2)
 library(zoo)
 ```
 
-# 1. Examining Seasonality
-Reading in New York City fatality data:
+# 1. Data Exploration and Preprocessing
+Reading in USA fatality data:
 ```{r, include = TRUE}
 USAFat <- as.vector(t(as.matrix(read_excel("data/USA-FatalCrashes.xlsx",
-  range = "B8:M17", col_names = FALSE,.name_repair = "unique_quiet"))))
-NYCFat <- as.vector(t(as.matrix(read_excel("data/NY-FatalCrashes.xlsx",
-  range = "B9:M18", col_names = FALSE,.name_repair = "unique_quiet"))))
-OREFat <- as.vector(t(as.matrix(read_excel("data/ORE-FatalCrashes.xlsx",
-  range = "B9:M18", col_names = FALSE,.name_repair = "unique_quiet"))))
+  range = "B8:M22", col_names = FALSE,.name_repair = "unique_quiet"))))
 ```
 
-## a. Seasonality of USA Data
+## a. Seasonality of Data
 ```{r, include = TRUE}
-USADate <- as.yearmon("2013-01") + seq((1/12),(120/12), by = (1/12)) - (1/12)
+USADate <- as.yearmon("2008-01") + seq((1/12),(180/12), by = (1/12)) - (1/12)
 USAData <- zoo(USAFat, USADate)
-plot(USAData, main = "USA Fatal Motor Vehicle Crashes by Month, 2013-2022",
+plot(USAData, main = "USA Fatal Motor Vehicle Crashes by Month, 2008-2022",
      xlab = "Month and Year", ylab = "Monthly Fatal Vehicle Crashes")
 ```
-
-
+Examining a typical year:
+```{r, include=TRUE}
+plot(USAData[49:60], main = "USA Fatal Motor Vehicle Crashes by Month, 2013",
+     xlab = "Month", ylab = "Monthly Fatal Vehicle Crashes")
+```
+Looking at the Seasonality:
 ```{r, include = TRUE}
-tsUSA <- ts(USAFat, start = 2013, freq = 12)
-tsNYC <- ts(NYCFat, start = 2013, freq = 12)
-tsORE <- ts(OREFat, start = 2013, freq = 12)
+tsUSA <- ts(USAFat, start = 2008, freq = 12)
 plot(decompose(tsUSA, type = "add"))
 ```
 
 
-## b. Collecting Population Data by State
+## b. Collecting fatality data on states that legalized pre-2022
 ```{r, include = TRUE}
-
+legStates <- c("Colorado", "Washington", "Oregon", "Alaska", "California",
+               "Massachusets", "Nevada", "Maine", "Vermont", "Michigan",
+               "Illinois", "Arizona", "Montana", "New Jersey", "New York",
+               "New Mexico", "Virginia", "Connecticut")
+legEffDate <- as.yearmon("2012-11") + 
+  (c(1,2,33,39,49,50,51,52,69,74,87,98,99,101,102,105,105,105)/12) - (1/12)
+#x <- paste("data/",legStates[2],".xlsx", sep = "")
+#as.vector(t(as.matrix(read_excel(x,
+#  range = "B9:M23", col_names = FALSE,.name_repair = "unique_quiet"))))
+legEffDate
 ```
+
+## c. Calculating State by State Population Data
+
+
+
+# 2. Difference of Means on Panel Data
