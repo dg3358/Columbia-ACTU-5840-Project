@@ -173,3 +173,21 @@ legMar <- as.integer(c(0,1,1,0,1,1,1,0,1,0,0,0,0,1,0,0,0,0,0,1,0,1,1,0,0,0,1,
 #% Population Over 70 by State, 2022
 
 ```
+
+### i. Testing distribution of Response
+```{r}
+set.seed(1)
+lambdaMLE <- mean(resp)
+#hist(resp, breaks = 20)
+#qqplot(resp, distribution = "poisson")
+PoissonDist <- rpois(length(resp), lambdaMLE)
+title <- sprintf("QQ Plot, Poisson Dist. with lambda = %.4f",lambdaMLE)
+qqplot(resp, PoissonDist, main = title)
+abline(0,1,col = 'red')
+```
+
+```{r, include = TRUE}
+set.seed(1)
+MLEMu <- mean(resp)
+MLESigma2 < var(resp)
+```
