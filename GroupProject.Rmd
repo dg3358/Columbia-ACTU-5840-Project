@@ -84,7 +84,6 @@ pacf(USAData)
 
 ```{r, include = TRUE}
 arima(USAData, order = c(1,0,0), method = "ML")
-?arima
 ```
 
 
@@ -141,21 +140,36 @@ print(testMeans$conf.int[1:2])
 So, $\mathbb{P}(T_{18} > 2.41257) = 0.01336 < 0.05$; I reject $H_0$ at $\alpha = 0.05$.
 
 
-## c. Random Forest to Predict Crashes
+## c. Decision Tree and Random Forest to Predict Crashes
 Features to split on: (Note Rhode Island legalized on 05/22/2022 so it should probably be excluded)
 \begin{itemize}
 \item Marijuana Legal? (Pre-2022)
-\item Proportion of Population in Urban Areas
-\item Percent Elderly Population
-\item 
+\item Proportion of Population in Urban Areas (2020)
+\item Speed Limits on Urban Interstates (as of 2024)
+\item % of Population Above 70 (2022)
 \item 
 \end{itemize}
 
 ```{r, include = TRUE}
+#Create response variable:
 avg2022 <- as.vector(t(as.matrix(read_excel("rfdata/2022StateData.xlsx",
     range = "B7:AZ8",col_names = TRUE,.name_repair = "unique_quiet"))))/12
 pop2022 <- as.vector(t(as.matrix(USAPOP[2022 - 2007,2:dim(USAPOP)[2]])))
 resp <- avg2022/pop2022
-urb <- c()
-perPop <- c()
+
+#Getting Percent Urban Population
+urbRaw <- read_excel("rfdata/UrbanRural.xlsx", sheet = "Data", range = "B1:AZ4")
+urb <- as.vector(t(urbRaw[2,]))/as.vector(t(urbRaw[1,]))
+
+#Speed Limits on Urban Interstates
+spL <- factor(c(70, 55, 65, 65, 65, 65, 55, 55, 55, 65, 70, 60, 75, 55, 55, 
+        55, 75, 65, 70, 75, 70, 65, 70, 65, 70, 60, 65, 70, 65, 65, 55, 75, 65, 
+        70, 75, 65, 70, 55, 70, 55, 70, 80, 70, 75, 70, 55, 70, 60, 55, 70, 75))
+
+#Marijuana Legalized?
+legMar <- as.integer(c(0,1,1,0,1,1,1,0,1,0,0,0,0,1,0,0,0,0,0,1,0,1,1,0,0,0,1,
+                   0,1,0,1,1,1,0,0,0,0,1,0,0,0,0,0,0,0,1,1,1,0,0,0))
+
+#% Population Over 70 by State, 2022
+
 ```
