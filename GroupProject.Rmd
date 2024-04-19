@@ -140,6 +140,7 @@ print(testMeans$conf.int[1:2])
 ```
 So, $\mathbb{P}(T_{18} > 2.41257) = 0.01336 < 0.05$; I reject $H_0$ at $\alpha = 0.05$.
 
+
 ## c. Random Forest to Predict Crashes
 Features to split on: (Note Rhode Island legalized on 05/22/2022 so it should probably be excluded)
 \begin{itemize}
