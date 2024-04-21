@@ -14,6 +14,7 @@ library(readxl)
 library(ggplot2)
 suppressWarnings(library(zoo))
 library(nlme)
+library(forecast)
 ```
 
 # 1. Data Exploration and Preprocessing
@@ -210,5 +211,62 @@ title <- sprintf("QQ Plot, Poisson Dist. with lambda = %.4f",lambdaMLE)
 qqplot(resp, PoissonDist, main = title)
 abline(0,1,col = 'red')
 ```
+
+```{r}
+set.seed(1)
+meanResp <- mean(resp)
+sdResp <- sd(resp)
+NormalDist <- rnorm(length(resp), meanResp, sdResp)
+title <- sprintf("QQ Plot, Normal Dist. with mean = %.4f and SD = %.4f", meanResp, sdResp)
+qqplot(resp, NormalDist, main = title)
+abline(0, 1, col = 'red')
+```
+
+```{r}
+set.seed(1)
+meanLogResp <- mean(log(resp))
+sdLogResp <- sd(log(resp))
+LogNormalDist <- rlnorm(length(resp), meanLogResp, sdLogResp)
+title <- sprintf("QQ Plot, Log-Normal Dist. with meanLog = %.4f and sdLog = %.4f", meanLogResp, sdLogResp)
+qqplot(resp, LogNormalDist, main = title)
+abline(0, 1, col = 'red')
+```
+
+### Auto Regression Code below
+```{r}
+# Splitting data set into first 80% as train set and last 20% as test set
+train_set <- ts(USAFat[1:floor(0.8 * length(USAFat))], start = 2008, freq = 12)
+test_set <- ts(USAFat[(floor(0.8 * length(USAFat)) + 1):length(USAFat)], start = 2020, freq = 12)
+```
+
+```{r}
+ar1_model <- ar(train_set, method = "mle")
+summary(ar1_model)
+```
+
+```{r}
+predictions <- forecast(ar1_model, h = length(test_set))
+plot(predictions, main = "Forecasts From AR(1)", xlab = "Time", ylab = "Monthly Fatal Vehicle Crashes")
+lines(test_set, col = "red", type = "o")
+legend("bottomleft", legend = c("Forecasts", "Actual"), col = c("black", "red"), lty = 1)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
