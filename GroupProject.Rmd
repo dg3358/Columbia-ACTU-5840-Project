@@ -14,7 +14,11 @@ library(readxl)
 library(ggplot2)
 suppressWarnings(library(zoo))
 library(nlme)
-library(forecast)
+suppressWarnings(library(forecast))
+library(rpart)
+suppressWarnings(library(rpart.plot))
+library(tree)
+suppressWarnings(library(randomForest))
 ```
 
 # 1. Data Exploration and Preprocessing
@@ -142,13 +146,16 @@ So, $\mathbb{P}(T_{18} > 2.41257) = 0.01336 < 0.05$; I reject $H_0$ at $\alpha =
 
 
 ## c. Decision Tree and Random Forest to Predict Crashes
+
+### i. Collecting Data
 Features to split on: (Note Rhode Island legalized on 05/22/2022 so it should probably be excluded)
 \begin{itemize}
 \item Marijuana Legal? (Pre-2022)
+\item Billions of Highway Miles-driven per 100,000 (2022)
 \item Proportion of Population in Urban Areas (2020)
 \item Speed Limits on Urban Interstates (as of 2024)
 \item % of Population Above 70 (2022)
-\item Total Damage in Millions of Dollars per 100,000 by Hazardous Weather Events (2022)
+\item Damage in Millions of Dollars per 100,000 by Hazardous Weather (2022)
 \item % of Binge Drinking by State (2022)
 \end{itemize}
 
@@ -188,27 +195,120 @@ hazard <- hazard/pop2022
 binge <- as.vector(t(as.matrix(read_excel("rfdata/BingeDrinking.xlsx",
                               sheet = "Data",range="C6:C57"))))/100
 
+#Billions of Highway-Miles Driven per 100,000 people
+hMiles <- t(as.matrix(read_excel("rfdata/hMiles.xlsx", range = "C1:C53")))
+#remove Puerto Rico
+hMiles <- hMiles[-c(40)]
+#take billions of Miles per 100,000 people
+hperHT <- (hMiles/1000)/pop2022
+
 #Final Data Gathering
-finData <- as.data.frame(cbind(resp, legMar, urb, spL, over_70, hazard, binge))
+finData <- as.data.frame(cbind(resp,legMar,hperHT,urb,spL,over_70,hazard,binge))
+corMat <- cor(finData)
 finData$legMar <- factor(finData$legMar)
 finData$spL <- factor(finData$spL)
+finData$hperHT <- round(finData$hperHT, 6)
 finData$urb <- round(finData$urb, 6)
 finData$over_70 <- round(finData$over_70, 6)
 finData$hazard <- round(finData$hazard, 6)
-finData
+finData$states <- colnames(USAPOP)[2:52]
+finData <- finData[,c(1,9,2:8)]
+colnames(finData) <- c("resp", "State", "Legal","HW_travel",
+                       "Urban", "Speed_Lim","over_70","hazard","binge")
+finData <- finData[which(finData$State != "Rhode Island"),]
+```
+
+### ii. 1 tree (for example)
+
+```{r, include = TRUE}
+set.seed(1)
+train_index <- sample(1:nrow(finData),.8 * nrow(finData),replace = FALSE)
+test_index <- setdiff(1:50, train_index)
+rtree <- tree(resp ~ ., data = finData[train_index,-c(2)])
+cv <- cv.tree(rtree, K = 5, FUN = prune.tree)
+par(oma = c(0,0,2,0))
+plot(cv)
+title(main = "Deviance of Tree vs. Number of Leaves, corresponding alpha",
+outer = TRUE)
+```
+
+```{r, include = TRUE}
+rtree <- rpart(resp ~., data = finData[train_index,-c(2)], method = "anova",
+               control = rpart.control(cp = 1/20))
+prp(rtree, main = "Regression Tree for Fatal Crashes per 100,000",
+    roundint = FALSE, extra = 1, digits = 4, branch.lty = 3)
+```
+```{r, include = TRUE}
+oneTree <- tree(resp ~ ., data = finData[train_index, -c(2)], method = "anova")
+oneTree <- prune.tree(oneTree, k = 30)
+predOneTree <- predict(oneTree, newdata = finData[test_index,3:9])
+mseOneTree <- mean((predOneTree - finData$resp[test_index])^2)
+pseudoROneTree <- 1 - (mseOneTree * 50)/(var(finData$resp) * 49)
+```
+
+### iii. Bagging
+I generate 5 different iterations of the random Forest for bagging in order to try and optimize for the number of trees:
+```{r, include = TRUE, warning = FALSE}
+num_tree = 200
+mseRBs <- c()
+for(j in 1:5){
+  set.seed(j)
+  rB_raw <- randomForest(resp ~., data = finData[,-c(2)], ntree = num_tree,
+      mtry = dim(finData)[2] - 2, importance = TRUE, keep.inbag = TRUE)
+  mseRBs <- append(mseRBs, rB_raw$mse)
+}
+mseRBs <- as.data.frame(matrix(mseRBs, nrow = num_tree, ncol = j))
+colnames(mseRBs) <- c(1:5)
+plotMSE <- ggplot(data = mseRBs, aes(x = 1:200)) +
+  geom_line(aes(y = `1`, color = "Seed 1")) + 
+  geom_line(aes(y = `2`, color = "Seed 2")) + 
+  geom_line(aes(y = `3`, color = "Seed 3")) + 
+  geom_line(aes(y = `4`, color = "Seed 4")) +
+  geom_line(aes(y = `5`, color = "Seed 5")) + 
+  xlab("Number of Trees") + ylab("OOB MSE") +
+  ggtitle("OOB MSE as a function of the number of Trees, 5 Simulations") + 
+  theme(legend.title = element_blank(), plot.title = element_text(hjust = 0.5))
+plotMSE
+```
+
+It seems as though around 50 is where the OOB MSE finishes decreasing. For the sake of bias-variance trade-off, I select 50 as the number of trees, and fit a random forest model:
+```{r, include = TRUE}
+set.seed(6)
+RB <- randomForest(resp ~., data = finData[,-c(2)], ntree = 50,
+      mtry = dim(finData)[2] - 2, importance = TRUE, keep.inbag = TRUE)
+mseRB <- RB$mse[50]
+pseudoRRB <- 1 - (mseRB * 50)/(var(finData$resp) * 49)
+RB$importance
+```
+
+
+
+### iv. Random Forest
+
+
+
+I generate summary statistics:
+```{r, include = TRUE}
+sumstats <- as.data.frame(cbind(c(mseOneTree, mseRB),
+                                c(pseudoROneTree, pseudoRRB)))
+colnames(sumstats) <- c("MSE", "Pseudo Rsq.")
+sumstats$Algorithm <- c("Decision Tree", "Bagged Forest")
+sumstats <- sumstats[,c(3,1,2)]
+sumstats
 ```
 
 ## d. Regression Analysis
 
+
 ### i. Testing distribution of Response
 ```{r}
 set.seed(1)
-lambdaMLE <- mean(resp)
+lambdaMLE <- mean(resp * 12)
 #hist(resp, breaks = 20)
 #qqplot(resp, distribution = "poisson")
 PoissonDist <- rpois(length(resp), lambdaMLE)
 title <- sprintf("QQ Plot, Poisson Dist. with lambda = %.4f",lambdaMLE)
-qqplot(resp, PoissonDist, main = title)
+qqplot(resp * 12, PoissonDist, main = title)
 abline(0,1,col = 'red')
 ```
 
@@ -230,6 +330,14 @@ LogNormalDist <- rlnorm(length(resp), meanLogResp, sdLogResp)
 title <- sprintf("QQ Plot, Log-Normal Dist. with meanLog = %.4f and sdLog = %.4f", meanLogResp, sdLogResp)
 qqplot(resp, LogNormalDist, main = title)
 abline(0, 1, col = 'red')
+```
+
+
+## Actual Linear Modeling
+```{r, include = TRUE}
+linMod <- lm("log(resp) ~ Speed_Lim",
+             data = finData)
+summary(linMod)
 ```
 
 ### Auto Regression Code below
