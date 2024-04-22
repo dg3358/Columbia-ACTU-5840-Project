@@ -180,9 +180,9 @@ Features to split on: (Note Rhode Island legalized on 05/22/2022 so it should pr
 \item Billions of Highway Miles-driven per 100,000 (2022)
 \item Proportion of Population in Urban Areas (2020)
 \item Speed Limits on Urban Interstates (as of 2024)
-\item % of Population Above 70 (2022)
+\item \% of Population Above 70 (2022)
 \item Damage in Millions of Dollars per 100,000 by Hazardous Weather (2022)
-\item % of Binge Drinking by State (2022)
+\item \% of Binge Drinking by State (2022)
 \end{itemize}
 
 ```{r, include = TRUE}
