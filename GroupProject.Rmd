@@ -359,8 +359,23 @@ lines(test_set, col = "red", type = "o")
 legend("bottomleft", legend = c("Forecasts", "Actual"), col = c("black", "red"), lty = 1)
 ```
 
+```{r}
+# Now use data of 2008-2021 as training set and 2022 data as testing set.
+train_set2 <- ts(USAFat[1:(length(USAFat) - 12)], start = 2008, freq = 12)
+test_set2 <- ts(USAFat[(length(USAFat) - 11):length(USAFat)], start = 2022, freq = 12)
+```
 
+```{r}
+ar1_model2 <- ar(train_set2, method = "mle")
+summary(ar1_model2)
+```
 
+```{r}
+predictions <- forecast(ar1_model2, h = length(test_set))
+plot(predictions, main = "Forecasts From AR(1)", xlab = "Time", ylab = "Monthly Fatal Vehicle Crashes")
+lines(test_set2, col = "red", type = "o")
+legend("bottomleft", legend = c("Forecasts", "Actual"), col = c("black", "red"), lty = 1)
+```
 
 
 
