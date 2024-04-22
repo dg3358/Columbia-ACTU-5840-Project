@@ -70,27 +70,29 @@ plot(decompose(tsUSA, type = "add"))
 ```{r}
 # Splitting data set into first 80% as train set and last 20% as test set
 train_set <- ts(USAFat[1:floor(0.8 * length(USAFat))], start = 2008, freq = 12)
-test_set <- ts(USAFat[(floor(0.8 * length(USAFat)) + 1):length(USAFat)], start = 2020, freq = 12)
+test_set <- ts(USAFat[(floor(0.8 * length(USAFat)) + 1):length(USAFat)], 
+               start = 2020, freq = 12)
 pacf(train_set, main = "Partial Autocorrelation, 2008-2020 Data")
 ```
 
 ```{r}
-ar1_model <- ar(train_set, method = "mle", order = 13)
+ar1_model <- ar(train_set, method = "mle")
 ```
 
 ```{r, include = TRUE}
 predictions <- forecast(ar1_model, h = length(test_set))
-plot(predictions, main = "Forecasts From AR(12)", xlab = "Time", ylab = "Monthly Fatal Vehicle Crashes")
+plot(predictions, main = "Forecasts From AR(12)", xlab = "Time",
+     ylab = "Monthly Fatal Vehicle Crashes")
 lines(test_set, col = "red", type = "o")
-legend("bottomleft", legend = c("Forecasts", "Actual"), col = c("black", "red"),
-       lty = 1)
+legend(x = 2010, y = 3400, legend = c("Forecasts", "Actual"), 
+       col = c("black", "red"), lty = 1)
 ```
 
 ```{r}
 # Now use data of 2008-2021 as training set and 2022 data as testing set.
 train_set2 <- ts(USAFat[1:(length(USAFat) - 12)], start = 2008, freq = 12)
 test_set2 <- ts(USAFat[(length(USAFat) - 11):length(USAFat)], start = 2022, freq = 12)
-pacf(train_set2)
+pacf(train_set2, main = "Partial Autocorrelation, 2008-2021 Data")
 ```
 
 ```{r}
@@ -102,7 +104,7 @@ predictions <- forecast(ar1_model2, h = length(test_set))
 plot(predictions, main = "Forecasts From AR(12), Include 2021 in Train", 
      xlab = "Time", ylab = "Monthly Fatal Vehicle Crashes")
 lines(test_set2, col = "red", type = "o")
-legend("bottomleft", legend = c("Forecasts", "Actual"), col = c("black", "red"), lty = 1)
+legend(x = 2010, y = 3600, legend = c("Forecasts", "Actual"), col = c("black", "red"), lty = 1)
 ```
 
 ## c. Collecting fatality dates on states that legalized pre-2022
