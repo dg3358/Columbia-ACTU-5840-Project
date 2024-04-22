@@ -17,8 +17,9 @@ library(nlme)
 suppressWarnings(library(forecast))
 library(rpart)
 suppressWarnings(library(rpart.plot))
-library(tree)
+suppressWarnings(library(tree))
 suppressWarnings(library(randomForest))
+suppressWarnings(library(olsrr))
 ```
 
 # 1. Data Exploration and Preprocessing
@@ -64,8 +65,47 @@ tsUSA <- ts(USAFat, start = 2008, freq = 12)
 plot(decompose(tsUSA, type = "add"))
 ```
 
+## b. Autocorrelation and Autoregression
 
-## b. Collecting fatality data on states that legalized pre-2022
+```{r}
+# Splitting data set into first 80% as train set and last 20% as test set
+train_set <- ts(USAFat[1:floor(0.8 * length(USAFat))], start = 2008, freq = 12)
+test_set <- ts(USAFat[(floor(0.8 * length(USAFat)) + 1):length(USAFat)], start = 2020, freq = 12)
+pacf(train_set, main = "Partial Autocorrelation, 2008-2020 Data")
+```
+
+```{r}
+ar1_model <- ar(train_set, method = "mle", order = 13)
+```
+
+```{r, include = TRUE}
+predictions <- forecast(ar1_model, h = length(test_set))
+plot(predictions, main = "Forecasts From AR(12)", xlab = "Time", ylab = "Monthly Fatal Vehicle Crashes")
+lines(test_set, col = "red", type = "o")
+legend("bottomleft", legend = c("Forecasts", "Actual"), col = c("black", "red"),
+       lty = 1)
+```
+
+```{r}
+# Now use data of 2008-2021 as training set and 2022 data as testing set.
+train_set2 <- ts(USAFat[1:(length(USAFat) - 12)], start = 2008, freq = 12)
+test_set2 <- ts(USAFat[(length(USAFat) - 11):length(USAFat)], start = 2022, freq = 12)
+pacf(train_set2)
+```
+
+```{r}
+ar1_model2 <- ar(train_set2, method = "mle")
+```
+
+```{r, include = TRUE}
+predictions <- forecast(ar1_model2, h = length(test_set))
+plot(predictions, main = "Forecasts From AR(12), Include 2021 in Train", 
+     xlab = "Time", ylab = "Monthly Fatal Vehicle Crashes")
+lines(test_set2, col = "red", type = "o")
+legend("bottomleft", legend = c("Forecasts", "Actual"), col = c("black", "red"), lty = 1)
+```
+
+## c. Collecting fatality dates on states that legalized pre-2022
 ```{r, include = TRUE}
 legStates <- c("Colorado", "Washington", "D.C.","Oregon", "Alaska","California",
                "Massachusetts", "Nevada", "Maine", "Vermont", "Michigan",
@@ -75,24 +115,10 @@ legEffDate <- as.yearmon("2012-11") +
   (c(1,2,29,33,39,49,50,51,52,69,74,87,98,99,101,102,105,105,105)/12) - (1/12)
 ```
 
-## c. Calculating State by State Population Data
-
-
 
 # 2. Modeling
 
-## a. Autocorrelation function
-
-```{r, include = TRUE}
-pacf(USAData)
-```
-
-```{r, include = TRUE}
-arima(USAData, order = c(1,0,0), method = "ML")
-```
-
-
-## b. Difference of Means on Panel Data
+## a. Difference of Means on Panel Data
 I do a difference of means test to see if there is a change in the average number of fatal crashes per 100,000 in the year pre-legalization vs. the year when legalization went into effect. I linearly interpolate between population estimates to get the population estimate to divide by (i.e. if legalization went into effect at March 2015, I take 2/12 of the population of 2015 and add 10/12 of the population of 2014 for the pre-legalization population):
 ```{r, include = TRUE}
 effDatefracs <- as.numeric(legEffDate) - as.integer(legEffDate)
@@ -145,7 +171,7 @@ print(testMeans$conf.int[1:2])
 So, $\mathbb{P}(T_{18} > 2.41257) = 0.01336 < 0.05$; I reject $H_0$ at $\alpha = 0.05$.
 
 
-## c. Decision Tree and Random Forest to Predict Crashes
+## b. Decision Tree and Random Forest to Predict Crashes
 
 ### i. Collecting Data
 Features to split on: (Note Rhode Island legalized on 05/22/2022 so it should probably be excluded)
@@ -283,10 +309,6 @@ RB$importance
 
 
 
-### iv. Random Forest
-
-
-
 I generate summary statistics:
 ```{r, include = TRUE}
 sumstats <- as.data.frame(cbind(c(mseOneTree, mseRB),
@@ -297,29 +319,32 @@ sumstats <- sumstats[,c(3,1,2)]
 sumstats
 ```
 
-## d. Regression Analysis
+## c. Regression Analysis
 
 
 ### i. Testing distribution of Response
 ```{r}
 set.seed(1)
-lambdaMLE <- mean(resp * 12)
+lambdaMLE <- mean(resp)
 #hist(resp, breaks = 20)
 #qqplot(resp, distribution = "poisson")
 PoissonDist <- rpois(length(resp), lambdaMLE)
 title <- sprintf("QQ Plot, Poisson Dist. with lambda = %.4f",lambdaMLE)
-qqplot(resp * 12, PoissonDist, main = title)
-abline(0,1,col = 'red')
+#qqplot(resp * 12, PoissonDist, main = title)
+#abline(0,1,col = 'red')
+hist(resp, breaks = 10)
 ```
 
+I examine the distribution of resp via qq-plots:
 ```{r}
 set.seed(1)
 meanResp <- mean(resp)
 sdResp <- sd(resp)
 NormalDist <- rnorm(length(resp), meanResp, sdResp)
-title <- sprintf("QQ Plot, Normal Dist. with mean = %.4f and SD = %.4f", meanResp, sdResp)
-qqplot(resp, NormalDist, main = title)
-abline(0, 1, col = 'red')
+title <- sprintf("QQ Plot, Normal Dist. with mean = %.4f and SD = %.4f",
+                 meanResp, sdResp)
+qqnorm(resp, main = title)
+qqline(resp, col = 2, lwd = 2, lty = 2)
 ```
 
 ```{r}
@@ -327,55 +352,42 @@ set.seed(1)
 meanLogResp <- mean(log(resp))
 sdLogResp <- sd(log(resp))
 LogNormalDist <- rlnorm(length(resp), meanLogResp, sdLogResp)
-title <- sprintf("QQ Plot, Log-Normal Dist. with meanLog = %.4f and sdLog = %.4f", meanLogResp, sdLogResp)
-qqplot(resp, LogNormalDist, main = title)
-abline(0, 1, col = 'red')
+title <- sprintf("QQ Plot, Log-Normal Dist. with mu = %.4f and sigma = %.4f", meanLogResp, sdLogResp)
+qqnorm(log(resp), main = title)
+qqline(log(resp), col = 2, lty = 2)
 ```
 
-
-## Actual Linear Modeling
+### ii. Best Subset Selection
 ```{r, include = TRUE}
-linMod <- lm("log(resp) ~ Speed_Lim",
-             data = finData)
-summary(linMod)
+train_data <- finData[train_index,-c(2)]
+test_data <- finData[test_index, -c(2)]
+linmodel <- lm(resp ~., data = train_data)
+best_sub <- ols_step_best_subset(linmodel)$metrics[,c("predictors", "rsquare",
+                                                   "adjr", "cp", "aic", "sbic")]
+best_sub
 ```
 
-### Auto Regression Code below
-```{r}
-# Splitting data set into first 80% as train set and last 20% as test set
-train_set <- ts(USAFat[1:floor(0.8 * length(USAFat))], start = 2008, freq = 12)
-test_set <- ts(USAFat[(floor(0.8 * length(USAFat)) + 1):length(USAFat)], start = 2020, freq = 12)
+### iii. Running best Model
+```{r, include = TRUE}
+linBestModel <- lm("resp ~ HW_travel + binge", data = train_data)
+predlinBest <- predict(linBestModel, newdata = test_data)
+linBestMSE <- mean((test_data$resp - predlinBest)^2)
+summary(linBestModel)
 ```
 
-```{r}
-ar1_model <- ar(train_set, method = "mle")
-summary(ar1_model)
+```{r, include = TRUE}
+MSEFin <- c(mseOneTree, mseRB, linBestMSE)
+prop_var_explained <- c(pseudoROneTree, pseudoRRB,
+                        best_sub$rsquare[which.min(best_sub$aic)])
+fin_stats <- as.data.frame(cbind(MSEFin, prop_var_explained))
+fin_stats$Algorithm <- c(sumstats$Algorithm, "Multiple Linear Regression")
+fin_stats <- fin_stats[,c(3,1,2)]
+colnames(fin_stats) <- c("Algorithm", "MSE", "Proportion of Variance Explained")
+fin_stats
 ```
 
-```{r}
-predictions <- forecast(ar1_model, h = length(test_set))
-plot(predictions, main = "Forecasts From AR(1)", xlab = "Time", ylab = "Monthly Fatal Vehicle Crashes")
-lines(test_set, col = "red", type = "o")
-legend("bottomleft", legend = c("Forecasts", "Actual"), col = c("black", "red"), lty = 1)
-```
 
-```{r}
-# Now use data of 2008-2021 as training set and 2022 data as testing set.
-train_set2 <- ts(USAFat[1:(length(USAFat) - 12)], start = 2008, freq = 12)
-test_set2 <- ts(USAFat[(length(USAFat) - 11):length(USAFat)], start = 2022, freq = 12)
-```
 
-```{r}
-ar1_model2 <- ar(train_set2, method = "mle")
-summary(ar1_model2)
-```
-
-```{r}
-predictions <- forecast(ar1_model2, h = length(test_set))
-plot(predictions, main = "Forecasts From AR(1)", xlab = "Time", ylab = "Monthly Fatal Vehicle Crashes")
-lines(test_set2, col = "red", type = "o")
-legend("bottomleft", legend = c("Forecasts", "Actual"), col = c("black", "red"), lty = 1)
-```
 
 
 
